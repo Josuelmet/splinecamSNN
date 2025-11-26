@@ -10,6 +10,10 @@ import spikingjelly.activation_based.layer
 
 from layer import LinearLIF, LIFBase
 
+
+# Helper method
+clone = lambda x: x.clone() if isinstance(x, torch.Tensor) else x
+
 # Basic skip layer: computes out_mod(in_mod(x) + skip_mod(skip))
 class SkipLayer(nn.Module):
     def __init__(self, in_mod, out_mod, skip_mod, keep_idx=None):
