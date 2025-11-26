@@ -1,1 +1,3 @@
-# splinecam-snn
+# Splinecam SNN
+
+TODO: insert instructions for use
