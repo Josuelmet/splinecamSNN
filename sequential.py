@@ -9,10 +9,9 @@ import spikingjelly.activation_based.neuron
 import spikingjelly.activation_based.layer
 
 from layer import LinearLIF, LIFBase
+from utils import isanyinstance, clone
 
 
-# Helper method
-clone = lambda x: x.clone() if isinstance(x, torch.Tensor) else x
 
 # Basic skip layer: computes out_mod(in_mod(x) + skip_mod(skip))
 class SkipLayer(nn.Module):
