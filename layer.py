@@ -8,11 +8,9 @@ import spikingjelly.activation_based as sj
 import spikingjelly.activation_based.neuron
 import spikingjelly.activation_based.layer
 
+from utils import isanyinstance, clone
 
 
-# Helper method
-def isanyinstance(obj, *classes):
-    return any([isinstance(obj, cls) for cls in classes])
 
 # Helper method
 def tensor(nums):
@@ -22,8 +20,6 @@ def tensor(nums):
     except TypeError:
         return torch.Tensor([nums])
 
-# Helper method
-clone = lambda x: x.clone() if isinstance(x, torch.Tensor) else x
 
 # Abstract LIF base class.
 # Defines initialization and forward pass of LIF neurons.
