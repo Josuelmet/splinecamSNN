@@ -1,4 +1,4 @@
-import networkx
+import networkx as nx
 import numpy as np
 from scipy import sparse
 
