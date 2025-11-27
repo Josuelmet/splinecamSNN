@@ -66,15 +66,13 @@ class LIFBase(nn.Module, ABC):
         # x is by default (time, batch, input)
         if batch_first:
             x = x.transpose(0, 1) # switch to default shape, timesteps first
-            x_skip = x.transpose(0, 1) # same as above
+            x_skip = x_skip.transpose(0, 1) # same as above
         hidden = torch.zeros(x.shape[:2] + (self.hidden_dim,), dtype=self.leak.dtype)
         spikes = torch.zeros(hidden.shape)
         for t in range(x.shape[0]):
             hidden[t] = x[t] @ self.W_in.T + spikes[t-1] @ self.W_rec.T
             if x_skip is not None and self.W_skip is not None:
-                print(hidden[t].shape, x_skip[t].shape, self.W_skip.T.shape)
-                #hidden[t] += x_skip[t] @ self.W_skip.T
-                hidden[t] = hidden[t] + x_skip[t] @ self.W_skip.T
+                hidden[t] += x_skip[t] @ self.W_skip.T
             if t > 0:
                 hidden[t] += self.calc_membrane_and_reset(hidden[t-1], spikes[t-1])
             spikes[t] = (hidden[t].real >= self.V_th).float()
