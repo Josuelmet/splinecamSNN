@@ -84,7 +84,7 @@ def calc_W_b(net, P, Vs, t, neuron, layer, response_t0_to_t1_from_V=None, rtol=1
         if layer == 0:
             W = lif.W_in + (lif.W_skip if lif.W_skip is not None else 0)
         else:
-            W = lif.W_skip
+            W = lif.W_skip if lif.W_skip is not None else torch.zeros(lif.W_in.shape[0], P.shape[-1]) # (h, d)
         response_t0_to_t1_from_V = calculate_per_timestep_responses(
             P=P, leak=lif.leak, W=W, rtol=rtol, atol=atol
         )
