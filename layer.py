@@ -72,7 +72,9 @@ class LIFBase(nn.Module, ABC):
         for t in range(x.shape[0]):
             hidden[t] = x[t] @ self.W_in.T + spikes[t-1] @ self.W_rec.T
             if x_skip is not None and self.W_skip is not None:
-                hidden[t] += x_skip[t] @ self.W_skip.T
+                print(hidden[t].shape, x_skip[t].shape, self.W_skip.T.shape)
+                #hidden[t] += x_skip[t] @ self.W_skip.T
+                hidden[t] = hidden[t] + x_skip[t] @ self.W_skip.T
             if t > 0:
                 hidden[t] += self.calc_membrane_and_reset(hidden[t-1], spikes[t-1])
             spikes[t] = (hidden[t].real >= self.V_th).float()
