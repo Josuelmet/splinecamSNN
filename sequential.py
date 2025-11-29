@@ -1,4 +1,5 @@
 import scipy
+from tqdm import tqdm
 
 import torch
 from torch import nn
