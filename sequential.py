@@ -134,3 +134,27 @@ class SequentialLIF(SkipSequential):
         # Count number of unique (T * all neurons) vectors.
         # Since spiking neurons are already either 0 or 1, we do not need to calculate signs.
         return torch.unique(signs, dim=0).shape[0]
+
+
+def splinecam_approximation(self, proj_x, proj_y, radius, xlim, ylim, num):
+    """
+    Approximate splinecam-SNN along a 2D slice of input space defined by proj_x and proj_y.
+    
+    Inputs:
+    - proj_x: (T, d) input projection (x-axis)
+    - proj_y: (T, d) input projection (y-axis)
+    - radius: float passed to local_complexity
+    - xlim: tuple defining minimum and maximum scalings of proj_x
+    - ylim: tuple defining minimum and maximum scalings of proj_y
+    - num: number of steps to discretize xlim and ylim along
+    """
+
+    out = torch.zeros(num, num)
+    for i, y in enumerate(tqdm(torch.linspace(ylim[1], ylim[0], num))):
+        for j, x in enumerate(torch.linspace(xlim[0], xlim[1], num)):
+            arr[i,j] = self.local_complexity(
+                proj_x * x + proj_y * y, num_vecs=2, radius=0.2,
+                projections = torch.stack((proj_x, proj_y))
+            )
+
+    return out
