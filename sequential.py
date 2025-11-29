@@ -153,7 +153,7 @@ class SequentialLIF(SkipSequential):
         out = torch.zeros(num, num)
         for i, y in enumerate(tqdm(torch.linspace(ylim[1], ylim[0], num))):
             for j, x in enumerate(torch.linspace(xlim[0], xlim[1], num)):
-                arr[i,j] = self.local_complexity(
+                out[i,j] = self.local_complexity(
                     proj_x * x + proj_y * y, num_vecs=2, radius=0.2,
                     projections = torch.stack((proj_x, proj_y))
                 )
