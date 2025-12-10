@@ -126,9 +126,9 @@ class SequentialLIF(SkipSequential):
             # Make a random orthonormal vectors of the same dimensionality as anchor
             assert num_vecs <= T*d
             # shape = (batch, T*d, num_vecs)
-            vecs = torch.Tensor(np.stack([
-                scipy.linalg.orth(torch.randn(T*d, num_vecs)) for _ in range(batch)
-            ]))
+            vecs = torch.stack([
+                torch.Tensor(scipy.linalg.orth(torch.randn(T*d, num_vecs))) for _ in range(batch)
+            ])
         else:
             # Make random orthonormal linear combinations of projection vectors,
             # which are presumably orthonormal and of shape (num_projections, T, d)
