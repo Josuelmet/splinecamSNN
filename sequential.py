@@ -98,46 +98,91 @@ class SequentialLIF(SkipSequential):
             return x, mem
         return x
 
-    def local_complexity(self, anchor, num_vecs, radius, projections=None):
-        # 1) Input checks
-        assert anchor.ndim in [2,3] # (T, d) or (T, batch=1, d)
-        if anchor.ndim == 3:
-            assert anchor.shape[1] == 1
-            anchor = anchor.squeeze(1)
-        dim = len(anchor.flatten())
-        assert num_vecs <= dim
+    def local_complexity(self, anchors, num_vecs, radius, projections=None, batch_first=True):
+        """
+        Estimate local complexity of piecewise-constant SNN (self) at anchor points.
 
-        # 2) Make orthonormal directions, repeated w/ different signs
+        Inputs:
+        - anchors: (T, d) if 2D, otherwise (num anchors, T, d) if batch_first is True else (T, num anchors, d)
+        - num_vecs: int, should be less than T*d or len(projections)
+        - radius: float
+        - projections: iterable of Tensors of shape (T, d)
+        - batch_first: bool
+
+        Output:
+        - An integer Tensor of shape (num anchors,)
+        """
+        # 1) Define anchors, a (batch, T, d) Tensor.
+        assert anchors.ndim in [2,3]
+        if anchors.ndim == 2: # (T, d)
+            anchors = anchors.unsqueeze(0) # (1, T, d)
+            batch_first = True
+        elif not batch_first: # (T, batch, d)
+            anchors = anchors.transpose(0,1) # (batch, T, d)
+        batch, T, d = anchors.shape
+
+        # 2) Make orthonormal directions
         if projections is None:
             # Make a random orthonormal vectors of the same dimensionality as anchor
-            vecs = torch.Tensor(scipy.linalg.orth(torch.randn(dim, num_vecs)))
+            assert num_vecs <= T*d
+            # shape = (batch, T*d, num_vecs)
+            vecs = torch.Tensor(np.stack([
+                scipy.linalg.orth(torch.randn(T*d, num_vecs)) for _ in range(batch)
+            ]))
         else:
             # Make random orthonormal linear combinations of projection vectors,
-            # which are presumably orthonormal and of effective shape (num_projections, dim)
-            projections = projections.flatten(1)
+            # which are presumably orthonormal and of shape (num_projections, T, d)
+            projections = projections if isinstance(projections, torch.Tensor) else torch.stack(projections)
+            assert projections.ndim == 3 and projections.shape[1:] == (T, d)
+            projections = projections.flatten(1) # shape = (num projections, T*d)
+            # make random orthonormal combinations of the projection vectors
             assert num_vecs <= len(projections)
-            vecs = torch.Tensor(scipy.linalg.orth(torch.randn(len(projections), num_vecs)))
-            vecs = projections.T @ vecs
-        # Repeat each column once, and scale by radius
-        vecs = vecs.repeat_interleave(2,1) * radius
-        # Flip sign of every other column
-        vecs[:, 1::2] *= -1
-        # Change shape from (dim, num_vecs*2) to (T, num_vecs*2, d)
-        vecs = vecs.reshape(anchor.shape + (num_vecs*2,))
+            # shape = (batch, num projections, num_vecs)
+            vecs = torch.Tensor(np.stack([
+                scipy.linalg.orth(torch.randn(len(projections), num_vecs)) for _ in range(batch)
+            ]))
+            # for each (len(projections) x num_vecs) 2D matrix in vecs, matrix-multiply it
+            # with projections (len(projections) x dim) to get a (dim x num_vecs) 2D matrix.
+            vecs = projections.T.unsqueeze(0) @ vecs
+
+        # 3) Duplicate the orthonormal directions, multiply the duplicates by -1, and scale all by radius.
+        # repeat twice along the last dimension. shape = (batch, dim=T*d, num_vecs*2)
+        vecs = vecs.repeat_interleave(2,-1)
+        # the number of vectors has been duplicated so we can multiply every other one by -1.
+        vecs[..., 1::2] *= -1
+        # scale by radius
+        vecs *= radius
+        # shape = (batch, num_vecs*2, dim=T*d)
         vecs = vecs.transpose(1,2)
+        # shape = (batch * num_vecs * 2, T, d)
+        vecs = vecs.reshape((-1,) + anchors.shape[1:])
 
-        # 3) simulate net w/ anchor (T, d) + directions (T, num_vecs*2, d)
-        inputs = anchor.unsqueeze(1) + vecs
-        # Pass thru net, and concatenate all outputs from all neurons as one dimension
-        signs = torch.cat(self(inputs, batch_first=False, return_all=True)[1], dim=-1)
-        # Change shape from (T, num_vecs*2, all neurons) to (num_vecs*2, T * all neurons)
-        signs = signs.transpose(0,1).flatten(1)
-        # Count number of unique (T * all neurons) vectors.
-        # Since spiking neurons are already either 0 or 1, we do not need to calculate signs.
-        return torch.unique(signs, dim=0).shape[0]
+        # 4) simulate net w/ anchors (batch, T, d) + directions (batch * num_vecs * 2, T, d)
+        # repeat anchors to be same shape as vecs, then add them
+        inputs = vecs + anchors.repeat_interleave(num_vecs*2, 0)
+        # Pass into net, and concatenate activity from all neurons as one dimension
+        # shape = (batch * num_vecs * 2, T, all neurons)
+        signs = torch.cat(self(inputs, batch_first=True, return_all=True)[1], dim=-1)
+        # organize signs along batch dimension, and merge the timestep and neuron dimensions
+        signs = signs.reshape(batch, num_vecs*2, -1)
 
+        return torch.Tensor([len(mat.unique(dim=0)) for mat in signs]).int() # shape = (batch,)
+
+
+    def local_complexity_batched(self, anchors, num_vecs, radius, projections=None, batch_first=True, batch_size=-1):
+        """
+        Calls local_complexity, but breaking the computation up into batch_size elements from anchors at a time.
+        """
+        out = torch.zeros(anchors.shape[0] if batch_first == True else anchors.shape[1])
+        batch_size = len(out) if batch_size < 1 else batch_size
+        for i in range(len(out) // batch_size):
+            out[i*batch_size : (i+1)*batch_size] = self.local_complexity(
+                anchors=anchors, num_vecs=num_vecs, radius=radius, projections=projections, batch_first=batch_first
+            )
+        return out
+            
     
-    def splinecam_approximation(self, proj_x, proj_y, radius, xlim, ylim, num):
+    def splinecam_approximation(self, proj_x, proj_y, radius, xlim, ylim, num, batch_size=-1):
         """
         Approximate splinecam-SNN along a 2D slice of input space defined by proj_x and proj_y.
         
@@ -148,13 +193,17 @@ class SequentialLIF(SkipSequential):
         - xlim: tuple defining minimum and maximum scalings of proj_x
         - ylim: tuple defining minimum and maximum scalings of proj_y
         - num: number of steps to discretize xlim and ylim along
+        - batch_size: number of points to compute local_complexity on at a time
+
+        Outputs:
+        - A 2D (num, num) Tensor of local complexities
         """
-    
-        out = torch.zeros(num, num)
-        for i, y in enumerate(tqdm(torch.linspace(ylim[1], ylim[0], num))):
-            for j, x in enumerate(torch.linspace(xlim[0], xlim[1], num)):
-                out[i,j] = self.local_complexity(
-                    proj_x * x + proj_y * y, num_vecs=2, radius=radius,
-                    projections = torch.stack((proj_x, proj_y))
-                )
-        return out
+
+        x = torch.linspace(xlim[0], xlim[1], num)
+        y = torch.linspace(ylim[0], ylim[1], num)
+        xx, yy = torch.meshgrid(x, y.flip(0), indexing='xy')
+        anchors = xx.reshape(-1,1,1) * proj_x + yy.reshape(-1,1,1) * proj_y
+        
+        return self.local_complexity_batched(
+            anchors=anchors, num_vecs=2, radius=radius, projections=(proj_x, proj_y), batch_first=True, batch_size=batch_size
+        )
