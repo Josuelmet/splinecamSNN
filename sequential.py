@@ -175,7 +175,7 @@ class SequentialLIF(SkipSequential):
         """
         out = torch.zeros(anchors.shape[0] if batch_first == True else anchors.shape[1])
         batch_size = len(out) if batch_size < 1 else batch_size
-        for i in range(len(out) // batch_size):
+        for i in tqdm(range(len(out) // batch_size)):
             out[i*batch_size : (i+1)*batch_size] = self.local_complexity(
                 anchors=anchors, num_vecs=num_vecs, radius=radius, projections=projections, batch_first=batch_first
             )
