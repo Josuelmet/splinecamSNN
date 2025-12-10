@@ -206,4 +206,4 @@ class SequentialLIF(SkipSequential):
         
         return self.local_complexity_batched(
             anchors=anchors, num_vecs=2, radius=radius, projections=(proj_x, proj_y), batch_first=True, batch_size=batch_size
-        )
+        ).reshape(num,num)
