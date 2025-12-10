@@ -138,9 +138,9 @@ class SequentialLIF(SkipSequential):
             # make random orthonormal combinations of the projection vectors
             assert num_vecs <= len(projections)
             # shape = (batch, num projections, num_vecs)
-            vecs = torch.Tensor(np.stack([
-                scipy.linalg.orth(torch.randn(len(projections), num_vecs)) for _ in range(batch)
-            ]))
+            vecs = torch.stack([
+                torch.Tensor(scipy.linalg.orth(torch.randn(len(projections), num_vecs))) for _ in range(batch)
+            ])
             # for each (len(projections) x num_vecs) 2D matrix in vecs, matrix-multiply it
             # with projections (len(projections) x dim) to get a (dim x num_vecs) 2D matrix.
             vecs = projections.T.unsqueeze(0) @ vecs
