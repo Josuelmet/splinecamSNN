@@ -110,7 +110,10 @@ class SequentialLIF(SkipSequential):
         - batch_first: bool
 
         Output:
-        - An integer Tensor of shape (num anchors,)
+        Two Tensors of shape (num anchors,):
+        - Estimated number of linear regions near the anchors ("local complexity")
+        - Estimated number of time-neuron boundaries near the anchors
+        The second may be better for dealing with partition boundaries that are densely packed near each other. 
         """
         # 1) Define anchors, a (batch, T, d) Tensor.
         assert anchors.ndim in [2,3]
@@ -164,22 +167,29 @@ class SequentialLIF(SkipSequential):
         # shape = (batch * num_vecs * 2, T, all neurons)
         signs = torch.cat(self(inputs, batch_first=True, return_all=True)[1], dim=-1)
         # organize signs along batch dimension, and merge the timestep and neuron dimensions
-        signs = signs.reshape(batch, num_vecs*2, -1)
+        signs = signs.reshape(batch, num_vecs*2, -1) # last dim = T * all neurons
 
-        return torch.Tensor([len(mat.unique(dim=0)) for mat in signs]).int() # shape = (batch,)
+        # Each Tensor has shape = (batch,).
+        # The first estimates the number of different linear regions near the anchors.
+        # However, it might be insensitive to small linear regions (i.e., densely packed partition boundaries).
+        # Thus, the second estimates the number of neuron-timesteps that change near the anchors.
+        return torch.Tensor([len(mat.unique(dim=0)) for mat in signs]), \
+               (signs.sum(1) % (num_vecs*2) != 0).sum(-1) # count neuron-timesteps that aren't constant
 
 
     def local_complexity_batched(self, anchors, num_vecs, radius, projections=None, batch_first=True, batch_size=-1):
         """
         Calls local_complexity, but breaking the computation up into batch_size elements from anchors at a time.
         """
-        out = torch.zeros(anchors.shape[0] if batch_first == True else anchors.shape[1])
+        out1 = torch.zeros(anchors.shape[0] if batch_first == True else anchors.shape[1])
+        out2 = torch.zeros_like(out1)
         batch_size = len(out) if batch_size < 1 else batch_size
         for i in tqdm(range(len(out) // batch_size)):
-            out[i*batch_size : (i+1)*batch_size] = self.local_complexity(
+            out1[i*batch_size : (i+1)*batch_size], \
+            out2[i*batch_size : (i+1)*batch_size] = self.local_complexity(
                 anchors=anchors, num_vecs=num_vecs, radius=radius, projections=projections, batch_first=batch_first
             )
-        return out
+        return out1, out2
             
     
     def splinecam_approximation(self, proj_x, proj_y, radius, xlim, ylim, num, batch_size=-1):
@@ -206,4 +216,4 @@ class SequentialLIF(SkipSequential):
         
         return self.local_complexity_batched(
             anchors=anchors, num_vecs=2, radius=radius, projections=(proj_x, proj_y), batch_first=True, batch_size=batch_size
-        ).reshape(num,num)
+        )[0].reshape(num,num)
