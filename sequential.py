@@ -173,7 +173,7 @@ class SequentialLIF(SkipSequential):
         # The first estimates the number of different linear regions near the anchors.
         # However, it might be insensitive to small linear regions (i.e., densely packed partition boundaries).
         # Thus, the second estimates the number of neuron-timesteps that change near the anchors.
-        return torch.Tensor([len(mat.unique(dim=0)) for mat in signs]), \
+        return torch.Tensor([len(mat.unique(dim=0)) for mat in signs]).int(), \
                (signs.sum(1) % (num_vecs*2) != 0).sum(-1) # count neuron-timesteps that aren't constant
 
 
