@@ -112,8 +112,9 @@ class SequentialLIF(SkipSequential):
         Output:
         Two Tensors of shape (num anchors,):
         - Estimated number of linear regions near the anchors ("local complexity")
-        - Estimated number of time-neuron boundaries near the anchors
-        The second may be better for dealing with partition boundaries that are densely packed near each other. 
+        - Estimated number of time-neuron boundaries near the anchors ("boundary count/density")
+        The first estimates linear areas, while the second estimates partition boundary counts.
+        The second may be better for dealing with partition boundaries that are densely packed near each other.
         """
         # 1) Define anchors, a (batch, T, d) Tensor.
         assert anchors.ndim in [2,3]
@@ -172,7 +173,7 @@ class SequentialLIF(SkipSequential):
         # Each Tensor has shape = (batch,).
         # The first estimates the number of different linear regions near the anchors.
         # However, it might be insensitive to small linear regions (i.e., densely packed partition boundaries).
-        # Thus, the second estimates the number of neuron-timesteps that change near the anchors.
+        # Thus, the second estimates the number of neuron-timesteps that change (i.e., boundaries) near the anchors.
         return torch.Tensor([len(mat.unique(dim=0)) for mat in signs]).int(), \
                (signs.sum(1) % (num_vecs*2) != 0).sum(-1) # count neuron-timesteps that aren't constant
 
