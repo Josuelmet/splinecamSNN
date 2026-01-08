@@ -166,7 +166,7 @@ class SequentialLIF(SkipSequential):
         inputs = vecs + anchors.repeat_interleave(num_vecs*2, 0)
         # Pass into net, and concatenate activity from all neurons as one dimension
         # shape = (batch * num_vecs * 2, T, all neurons)
-        signs = torch.cat(self(inputs, batch_first=True, return_all=True)[1], dim=-1)
+        signs = torch.cat(self(inputs, batch_first=True, return_all=True, detach=True)[1], dim=-1)
         # organize signs along batch dimension, and merge the timestep and neuron dimensions
         signs = signs.reshape(batch, num_vecs*2, -1) # last dim = T * all neurons
 
