@@ -80,15 +80,15 @@ class SequentialLIF(SkipSequential):
                 raise ValueError(f"Output module {out_mod} is not a supported LIF layer. Make sure LIF layers follow Linear layers.")
         return SequentialLIF(*modules)
 
-    def forward(self, x, batch_first=False, return_all=False, return_mem=False):
+    def forward(self, x, batch_first=False, return_all=False, return_mem=False, detach=True):
         all_spikes = []
         all_mem = []
         x_init = clone(x)
         for module in self:
             assert isinstance(module, LIFBase) # we assume every layer is an LIF layer (w/ input, recurrent, and skip connections already included)
             x, mem = module(x, x_init, batch_first=batch_first) # spikes, membrane
-            all_spikes.append(x)
-            all_mem.append(mem)
+            all_spikes.append(x.detach() if detach else x)
+            all_mem.append(mem.detach() if detach else mem)
 
         if return_all:
             if return_mem:
